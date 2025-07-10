@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2회차 - 임시</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 30px;
+            background: linear-gradient(135deg, #ffd1dc 0%, #ffecb3 100%);
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        *, *::before, *::after {
+            box-sizing: inherit;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        #puzzle-pieces, #puzzle-board {
+            width: 360px;
+            padding: 25px;
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 25px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+        #puzzle-pieces h2, #puzzle-board h2 {
+            text-align: center;
+            margin-top: 0;
+            color: #e91e63;
+            margin-bottom: 20px;
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 2.8em;
+            font-weight: 400;
+            text-shadow: 1px 1px 0px #fff, 2px 2px 0px rgba(0,0,0,0.1);
+        }
+
+        .piece {
+            /* --- 사각형 조각 배경색 변경 (산뜻한 연두색) --- */
+            background-color: #81c784;
+            color: #333;
+            margin-bottom: 15px;
+            border-radius: 18px;
+            cursor: grab;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+            transition: transform 0.15s ease-in-out, background-color 0.2s ease, clip-path 0.2s ease, box-shadow 0.2s ease, opacity 0.15s ease-in-out;
+            width: 100%;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            font-family: 'Gaegu', cursive;
+            /* --- 글씨 크기 증가 --- */
+            font-size: 1.2em;
+            text-align: center;
+            font-weight: 700;
+            border: 3px solid rgba(255,255,255,0.7);
+        }
+
+        .piece:not(.dragging):hover {
+            transform: scale(1.06);
+            box-shadow: 0 5px 12px rgba(0,0,0,0.15);
+        }
+
+        .piece:active {
+            transform: scale(1.08) rotate(2deg);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+        }
+
+        .piece.dragging {
+            opacity: 0.6;
+            transform: scale(1.08) rotate(2deg);
+            box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+        }
+
+        .piece[data-step="1"] {
+            background-color: #ffd54f; /* 1단계는 노란색 유지 */
+            color: #6D4C41;
+            clip-path: polygon(85% 0%, 15% 0%, 0% 50%, 15% 100%, 85% 100%, 100% 50%);
+            border-radius: 0;
+            border: none;
+        }
+        /* data-step 2, 3, 4는 기본 .piece의 background-color(#c8e6c9)를 사용 */
+        .piece[data-step="2"], .piece[data-step="3"], .piece[data-step="4"] { }
+
+        .piece[data-step="5"] {
+            background-color: #ffab91; /* 5단계는 파스텔 코랄 유지 */
+            color: #BF360C;
+            clip-path: url(#wavyOutputClip);
+            border-radius: 0;
+            border: none;
+        }
+
+        .drop-zone {
+            background-color: rgba(255, 255, 255, 0.6);
+            color: #78909c;
+            margin-bottom: 18px;
+            border: 3px dashed #ffbad1;
+            border-radius: 18px;
+            text-align: center;
+            width: 100%;
+            height: 100px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            font-family: 'Gaegu', cursive;
+            font-size: 1.2em;
+            font-weight: 700;
+        }
+
+        .drop-zone.over {
+            background-color: #c8e6c9;
+            border-color: #81c784;
+        }
+
+        .drop-zone.filled {
+            background-color: transparent;
+            border-style: solid;
+            border-color: #ecf1f1;
+            padding: 0;
+        }
+
+        .drop-zone.filled .piece {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            box-shadow: none;
+            cursor: default;
+        }
+        .drop-zone.filled .piece:not([data-step="1"]):not([data-step="5"]) {
+             border: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #fff0f5;
+            margin: auto;
+            padding: 30px;
+            border: 5px solid #ffb6c1;
+            width: 90%;
+            max-width: 450px;
+            border-radius: 20px;
+            position: relative;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            font-family: 'Gaegu', cursive;
+            font-size: 1.2em;
+        }
+
+        .close-button {
+            color: #e91e63;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 35px;
+            font-weight: bold;
+            transition: transform 0.2s ease;
+            cursor: pointer;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: #ad1457;
+            text-decoration: none;
+            transform: scale(1.1);
+        }
+
+        /* --- 시계 SVG 아이콘 컨테이너 스타일 --- */
+        #clock-icon-wrapper {
+            width: 100px; /* SVG 크기에 맞게 조정 */
+            height: 100px;
+            margin: 20px auto 10px auto;
+            cursor: pointer;
+            display: none; /* JS에서 제어 */
+        }
+        #clock-icon-wrapper svg { /* SVG 요소 자체의 크기 */
+            width: 100%;
+            height: 100%;
+        }
+
+        #time-display {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #d32f2f;
+            margin-top: 10px;
+            display: none; /* JS에서 제어 */
+            font-family: 'Gaegu', cursive;
+        }
+
+        #completion-message {
+            font-size: 1.6em;
+            color: #4CAF50;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+            line-height: 1.4;
+            font-family: 'Gaegu', cursive;
+        }
+
+        #check-button, #reset-button {
+            padding: 14px 28px;
+            font-size: 1.2em;
+            color: white;
+            background-color: #ff9800;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            margin-top: 15px;
+            box-shadow: 0 4px 0 #e68a00;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            font-family: 'Gaegu', cursive;
+            font-weight: 700;
+        }
+        #reset-button {
+            background-color: #f44336;
+            box-shadow: 0 4px 0 #d32f2f;
+            margin-left: 15px;
+        }
+        #check-button:hover {
+            background-color: #ffa726;
+        }
+        #check-button:active, #reset-button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #c77400;
+        }
+        #reset-button:hover {
+            background-color: #ef5350;
+        }
+        #reset-button:active {
+            box-shadow: 0 2px 0 #b22a2a;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+            justify-content: center;
+        }
+
+        .hidden-svg {
+            position: absolute;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+            left: -100%;
+            top: -100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="puzzle-pieces">
+            <h2>조각 상자</h2>
+        </div>
+
+        <div id="puzzle-board">
+            <h2>순서 맞추기</h2>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="check-button">확인하기</button>
+        <button id="reset-button">다시 시작</button>
+    </div>
+
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">×</span>
+            <p id="completion-message"></p>
+            <div id="clock-icon-wrapper">
+                <!-- SVG 시계 아이콘 (8시 40분) -->
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="45" stroke="#5C3A0A" stroke-width="5" fill="#FFFBE0" />
+                    <!-- 숫자 -->
+                    <text x="50" y="18" font-family="Gaegu, sans-serif" font-size="10" text-anchor="middle" fill="#333">12</text>
+                    <text x="82" y="54" font-family="Gaegu, sans-serif" font-size="10" text-anchor="middle" fill="#333">3</text>
+                    <text x="50" y="88" font-family="Gaegu, sans-serif" font-size="10" text-anchor="middle" fill="#333">6</text>
+                    <text x="18" y="54" font-family="Gaegu, sans-serif" font-size="10" text-anchor="middle" fill="#333">9</text>
+                    <!-- 시침 (8시 40분 -> 8과 9 사이) -->
+                    <line x1="50" y1="50" x2="50" y2="30" stroke="#333" stroke-width="5" stroke-linecap="round" transform="rotate(260 50 50)" />
+                    <!-- 분침 (40분 -> 숫자 8) -->
+                    <line x1="50" y1="50" x2="50" y2="20" stroke="#333" stroke-width="3" stroke-linecap="round" transform="rotate(240 50 50)" />
+                    <circle cx="50" cy="50" r="4" fill="#333" />
+                </svg>
+            </div>
+            <div id="time-display"></div>
+        </div>
+    </div>
+
+    <svg class="hidden-svg">
+      <defs>
+        <clipPath id="wavyOutputClip" clipPathUnits="objectBoundingBox">
+          <path d="M1,0 L0,0 L0,0.8 Q0.25 1.15 0.5 0.8 T1 0.8 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const puzzlePiecesContainer = document.getElementById('puzzle-pieces');
+            const puzzleBoardContainer = document.getElementById('puzzle-board');
+
+            const pieceData = [
+                { text: "자리에서 일어나기", step: "1" },
+                { text: "화장실에 가서 씻기", step: "2" },
+                { text: "옷입기", step: "3" },
+                { text: "문을 나가기", step: "4" },
+                { text: "학교에 도착하기", step: "5" }
+            ];
+            const totalDropZones = 5;
+
+            const checkButton = document.getElementById('check-button');
+            const resetButton = document.getElementById('reset-button');
+            const resultModal = document.getElementById('result-modal');
+            const closeModalButton = resultModal.querySelector('.close-button');
+            const completionMessage = document.getElementById('completion-message');
+            
+            const clockIconWrapper = document.getElementById('clock-icon-wrapper');
+            const timeDisplay = document.getElementById('time-display');
+
+            let draggedPiece = null;
+
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+
+            function initializePuzzle() {
+                puzzleBoardContainer.innerHTML = '<h2>순서 맞추기</h2>';
+                puzzlePiecesContainer.innerHTML = '<h2>조각 상자</h2>';
+
+                for (let i = 1; i <= totalDropZones; i++) {
+                    const zone = document.createElement('div');
+                    zone.classList.add('drop-zone');
+                    zone.dataset.expectedStep = i;
+                    zone.textContent = `${i}단계`;
+                    puzzleBoardContainer.appendChild(zone);
+                }
+
+                let piecesToShuffle = pieceData.map(data => {
+                    const piece = document.createElement('div');
+                    piece.classList.add('piece');
+                    piece.textContent = data.text;
+                    piece.draggable = true;
+                    piece.dataset.step = data.step;
+                    return piece;
+                });
+                
+                shuffleArray(piecesToShuffle);
+                piecesToShuffle.forEach(piece => {
+                    puzzlePiecesContainer.appendChild(piece);
+                });
+
+                addDragEventListeners();
+
+                clockIconWrapper.style.display = 'none';
+                timeDisplay.style.display = 'none';
+                timeDisplay.textContent = '';
+                closeModal();
+            }
+
+            function handleDragStart(e) {
+                draggedPiece = e.target;
+                e.dataTransfer.setData('text/plain', e.target.dataset.step);
+                setTimeout(() => {
+                    if (draggedPiece) draggedPiece.classList.add('dragging');
+                }, 0);
+            }
+
+            function handleDragEnd(e) {
+                if (draggedPiece) draggedPiece.classList.remove('dragging');
+                draggedPiece = null;
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                if (this.children.length === 0 || (this.children.length === 1 && this.children[0].nodeType === Node.TEXT_NODE)) {
+                    this.classList.add('over');
+                }
+            }
+
+            function handleDragLeave(e) {
+                this.classList.remove('over');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                this.classList.remove('over');
+                
+                if (!draggedPiece) return;
+
+                if (this.children.length === 0 || (this.children.length === 1 && this.children[0].nodeType === Node.TEXT_NODE)) {
+                    if (draggedPiece.parentElement.classList.contains('drop-zone')) {
+                        const oldZone = draggedPiece.parentElement;
+                        oldZone.textContent = `${oldZone.dataset.expectedStep}단계`;
+                        oldZone.classList.remove('filled');
+                    }
+                    this.innerHTML = '';
+                    this.appendChild(draggedPiece);
+                    this.classList.add('filled');
+                    draggedPiece.style.cursor = 'default';
+                }
+            }
+
+            function addDragEventListeners() {
+                const currentPieces = document.querySelectorAll('.piece');
+                currentPieces.forEach(piece => {
+                    piece.removeEventListener('dragstart', handleDragStart);
+                    piece.removeEventListener('dragend', handleDragEnd);
+                    piece.addEventListener('dragstart', handleDragStart);
+                    piece.addEventListener('dragend', handleDragEnd);
+                });
+
+                const currentDropZones = document.querySelectorAll('.drop-zone');
+                currentDropZones.forEach(zone => {
+                    zone.removeEventListener('dragover', handleDragOver);
+                    zone.removeEventListener('dragleave', handleDragLeave);
+                    zone.removeEventListener('drop', handleDrop);
+                    zone.addEventListener('dragover', handleDragOver);
+                    zone.addEventListener('dragleave', handleDragLeave);
+                    zone.addEventListener('drop', handleDrop);
+                });
+            }
+            
+            clockIconWrapper.addEventListener('click', () => {
+                if (timeDisplay.style.display === 'none' || timeDisplay.textContent === '') {
+                    timeDisplay.textContent = '8시 40분';
+                    timeDisplay.style.display = 'block';
+                } else {
+                    timeDisplay.style.display = 'none';
+                }
+            });
+
+            function checkPuzzle() {
+                let allCorrect = true;
+                let allZonesFilled = true;
+                const currentDropZones = document.querySelectorAll('#puzzle-board .drop-zone');
+
+                if (currentDropZones.length !== totalDropZones) {
+                    allCorrect = false;
+                    allZonesFilled = false;
+                } else {
+                     currentDropZones.forEach(zone => {
+                        if (zone.children.length === 0 || zone.children[0].nodeType === Node.TEXT_NODE) {
+                            allCorrect = false;
+                            allZonesFilled = false;
+                        } else if (!zone.children[0].classList || !zone.children[0].classList.contains('piece')) {
+                            allCorrect = false;
+                        } else if (zone.dataset.expectedStep !== zone.children[0].dataset.step) {
+                            allCorrect = false;
+                        }
+                    });
+                }
+
+                clockIconWrapper.style.display = 'none';
+                timeDisplay.style.display = 'none';
+                timeDisplay.textContent = '';
+
+                if (!allZonesFilled) {
+                    completionMessage.innerHTML = '앗! 아직 빈 칸이 있어요!<br>모든 조각을 옮겨주세요! 🐨';
+                } else if (allCorrect) {
+                    completionMessage.innerHTML = '외출 준비 완료! 🎒<br>시계를 눌러 시간을 확인해봐! 🎉🐨';
+                    clockIconWrapper.style.display = 'block';
+                } else {
+                    completionMessage.innerHTML = '아직 순서가 맞지 않아요.<br>다시 한번 확인해보세요! 🐨';
+                }
+                openModal();
+            }
+
+            function openModal() { resultModal.style.display = "flex"; }
+            function closeModal() { resultModal.style.display = "none"; }
+
+            closeModalButton.addEventListener('click', closeModal);
+            window.addEventListener('click', (event) => {
+                if (event.target === resultModal) { closeModal(); }
+            });
+
+            checkButton.addEventListener('click', checkPuzzle);
+            resetButton.addEventListener('click', initializePuzzle);
+
+            initializePuzzle();
+        });
+    </script>
+</body>
+</html>
