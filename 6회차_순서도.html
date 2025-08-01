@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6회차 - 누가 이겼을까?</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 30px;
+            background: linear-gradient(135deg, #ffd1dc 0%, #ffecb3 100%);
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        *, *::before, *::after {
+            box-sizing: inherit;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        #puzzle-pieces, #puzzle-board {
+            width: 360px;
+            padding: 25px;
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 25px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+        #puzzle-pieces h2, #puzzle-board h2 {
+            text-align: center;
+            margin-top: 0;
+            color: #e91e63;
+            margin-bottom: 20px;
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 2.8em;
+            font-weight: 400;
+            text-shadow: 1px 1px 0px #fff, 2px 2px 0px rgba(0,0,0,0.1);
+        }
+
+        .piece {
+            background-color: #81c784;
+            color: #333;
+            margin-bottom: 15px;
+            border-radius: 18px;
+            cursor: grab;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+            transition: transform 0.15s ease-in-out, background-color 0.2s ease, clip-path 0.2s ease, box-shadow 0.2s ease, opacity 0.15s ease-in-out;
+            width: 100%;
+            height: 80px; /* 4개이므로 높이 살짝 조정 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            font-family: 'Gaegu', cursive;
+            font-size: 1.1em;
+            text-align: center;
+            font-weight: 700;
+            border: 3px solid rgba(255,255,255,0.7);
+        }
+
+        .piece.dragging { opacity: 0.6; transform: scale(1.08) rotate(2deg); }
+
+        /* --- 1단계 조각: 육각형 --- */
+        .piece[data-step="1"] {
+            background-color: #ffd54f;
+            color: #6D4C41;
+            clip-path: polygon(85% 0%, 15% 0%, 0% 50%, 15% 100%, 85% 100%, 100% 50%);
+            border-radius: 0;
+            border: none;
+        }
+        /* --- 2, 3단계 조각: 기본 직사각형 --- */
+        .piece[data-step="2"], .piece[data-step="3"] {
+             /* 기본 스타일 사용 */
+        }
+        /* --- 4단계 조각: 결과 도형 --- */
+        .piece[data-step="4"] {
+            background-color: #ffab91;
+            color: #BF360C;
+            clip-path: url(#wavyOutputClip);
+            border-radius: 0;
+            border: none;
+        }
+
+        .drop-zone {
+            background-color: rgba(255, 255, 255, 0.6);
+            color: #78909c;
+            margin-bottom: 15px;
+            border: 3px dashed #ffbad1;
+            border-radius: 18px;
+            text-align: center;
+            width: 100%;
+            height: 80px; /* 높이 통일 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            font-family: 'Gaegu', cursive;
+            font-size: 1.2em;
+            font-weight: 700;
+        }
+
+        .drop-zone.over { background-color: #c8e6c9; border-color: #81c784; }
+
+        .drop-zone.filled {
+            background-color: transparent; border-style: solid;
+            border-color: #ecf1f1; padding: 0;
+        }
+        .drop-zone.filled .piece {
+            width: 100%; height: 100%; margin: 0; box-shadow: none; cursor: default;
+        }
+        .drop-zone.filled .piece:not([data-step="1"]):not([data-step="4"]) {
+             border: none;
+        }
+
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background-color: #fff0f5; margin: auto; padding: 25px; border: 5px solid #ffb6c1;
+            width: 90%; max-width: 500px; border-radius: 20px; position: relative; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: 'Gaegu', cursive; font-size: 1.2em;
+        }
+        .close-button {
+            color: #e91e63; position: absolute; top: 10px; right: 15px; font-size: 35px;
+            font-weight: bold; transition: transform 0.2s ease; cursor: pointer;
+        }
+        .close-button:hover, .close-button:focus { color: #ad1457; transform: scale(1.1); }
+        
+        /* --- 숫자 비교 활동 영역 --- */
+        #activity-area { display: none; }
+        #comparison-area {
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .player-card {
+            background-color: #fff;
+            border: 4px solid #ffca28;
+            border-radius: 15px;
+            padding: 15px;
+            width: 45%;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+        }
+        .player-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.15);
+        }
+        .player-card.winner {
+            border-color: #69f0ae;
+            box-shadow: 0 0 20px rgba(105, 240, 174, 0.8);
+        }
+        .player-card.winner::after {
+            content: '👑';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 2.5em;
+        }
+        .player-card.disabled {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+        .player-name { font-size: 1.3em; font-weight: 700; color: #c2185b; }
+        .card-number { font-size: 3.5em; font-weight: 700; color: #1e88e5; margin: 5px 0; }
+        .item-display {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 5px;
+            margin-top: 10px;
+            min-height: 50px;
+        }
+        .koala-item { font-size: 1.2em; }
+
+        #completion-message {
+            font-size: 1.6em; color: #4CAF50; font-weight: bold; text-align: center;
+            margin-bottom: 15px; line-height: 1.4;
+        }
+
+        #check-button, #reset-button {
+            padding: 14px 28px; font-size: 1.2em; color: white; background-color: #ff9800;
+            border: none; border-radius: 30px; cursor: pointer; transition: background-color 0.2s ease, transform 0.1s ease;
+            margin-top: 15px; box-shadow: 0 4px 0 #e68a00; text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            font-family: 'Gaegu', cursive; font-weight: 700;
+        }
+        #reset-button { background-color: #f44336; box-shadow: 0 4px 0 #d32f2f; margin-left: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="puzzle-pieces"><h2>조각 상자</h2></div>
+        <div id="puzzle-board"><h2>순서 맞추기</h2></div>
+    </div>
+    <div class="controls">
+        <button id="check-button">확인하기</button>
+        <button id="reset-button">다시 시작</button>
+    </div>
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">×</span>
+            <p id="completion-message"></p>
+            <div id="activity-area">
+                <div id="comparison-area"></div>
+            </div>
+        </div>
+    </div>
+    <svg class="hidden-svg">
+      <defs>
+        <clipPath id="wavyOutputClip" clipPathUnits="objectBoundingBox">
+          <path d="M1,0 L0,0 L0,0.8 Q0.25 1.15 0.5 0.8 T1 0.8 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const puzzlePiecesContainer = document.getElementById('puzzle-pieces');
+            const puzzleBoardContainer = document.getElementById('puzzle-board');
+            
+            // ==========================================================
+            // ===               ★★★ 여기가 핵심 수정 1 ★★★            ===
+            // ==========================================================
+            const pieceData = [
+                { text: "숫자 카드를 준비해요", step: "1" },
+                { text: "코알라는 5, 친구는 3을 냈어요", step: "2" },
+                { text: "두 수를 비교해보아요", step: "3" },
+                { text: "누가 승자일까?", step: "4" }
+            ];
+            const totalDropZones = 4;
+
+            const checkButton = document.getElementById('check-button');
+            const resetButton = document.getElementById('reset-button');
+            const resultModal = document.getElementById('result-modal');
+            const closeModalButton = resultModal.querySelector('.close-button');
+            const completionMessage = document.getElementById('completion-message');
+            const activityArea = document.getElementById('activity-area');
+            const comparisonArea = document.getElementById('comparison-area');
+
+            let draggedPiece = null;
+
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+
+            function initializePuzzle() {
+                puzzleBoardContainer.innerHTML = '<h2>순서 맞추기</h2>';
+                puzzlePiecesContainer.innerHTML = '<h2>조각 상자</h2>';
+                for (let i = 1; i <= totalDropZones; i++) {
+                    const zone = document.createElement('div');
+                    zone.className = 'drop-zone';
+                    zone.dataset.expectedStep = i;
+                    zone.textContent = `${i}단계`;
+                    puzzleBoardContainer.appendChild(zone);
+                }
+                let piecesToShuffle = pieceData.map(data => createPiece(data));
+                shuffleArray(piecesToShuffle);
+                piecesToShuffle.forEach(piece => puzzlePiecesContainer.appendChild(piece));
+                addDragEventListeners();
+                activityArea.style.display = 'none';
+                closeModal();
+            }
+
+            function createPiece(data) {
+                const piece = document.createElement('div');
+                piece.className = 'piece';
+                piece.textContent = data.text;
+                piece.draggable = true;
+                piece.dataset.step = data.step;
+                return piece;
+            }
+
+            function handleDragStart(e) {
+                if (e.target.classList.contains('piece')) {
+                    draggedPiece = e.target;
+                    setTimeout(() => e.target.classList.add('dragging'), 0);
+                }
+            }
+            function handleDragEnd(e) {
+                if (e.target.classList.contains('piece')) {
+                    e.target.classList.remove('dragging');
+                    draggedPiece = null;
+                }
+            }
+            function handleDragOver(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (target && target.classList.contains('drop-zone') && !target.querySelector('.piece')) {
+                    target.classList.add('over');
+                }
+            }
+            function handleDragLeave(e) {
+                e.target.closest('.drop-zone, #puzzle-pieces')?.classList.remove('over');
+            }
+            function handleDrop(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (!target || !draggedPiece) return;
+                target.classList.remove('over');
+                
+                if (target.id === 'puzzle-pieces' || !target.querySelector('.piece')) {
+                    if (draggedPiece.parentElement.classList.contains('drop-zone')) {
+                        const oldZone = draggedPiece.parentElement;
+                        oldZone.textContent = `${oldZone.dataset.expectedStep}단계`;
+                        oldZone.classList.remove('filled');
+                    }
+                    if(target.id === 'puzzle-pieces') {
+                        puzzlePiecesContainer.appendChild(draggedPiece);
+                    } else {
+                       target.innerHTML = '';
+                       target.appendChild(draggedPiece);
+                       target.classList.add('filled');
+                    }
+                }
+            }
+
+            function addDragEventListeners() {
+                const elements = document.querySelectorAll('.piece, .drop-zone, #puzzle-pieces');
+                elements.forEach(el => {
+                    el.addEventListener('dragstart', handleDragStart);
+                    el.addEventListener('dragend', handleDragEnd);
+                    el.addEventListener('dragover', handleDragOver);
+                    el.addEventListener('dragleave', handleDragLeave);
+                    el.addEventListener('drop', handleDrop);
+                });
+            }
+
+            // ==========================================================
+            // ===               ★★★ 여기가 핵심 수정 2 ★★★            ===
+            // ==========================================================
+            function setupComparisonActivity() {
+                comparisonArea.innerHTML = '';
+                const players = [{ name: '코알라', score: 5 }, { name: '친구', score: 3 }];
+
+                players.forEach(player => {
+                    const card = document.createElement('div');
+                    card.className = 'player-card';
+
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'player-name';
+                    nameEl.textContent = player.name;
+                    card.appendChild(nameEl);
+
+                    const numberEl = document.createElement('div');
+                    numberEl.className = 'card-number';
+                    numberEl.textContent = player.score;
+                    card.appendChild(numberEl);
+
+                    const itemsEl = document.createElement('div');
+                    itemsEl.className = 'item-display';
+                    for (let i = 0; i < player.score; i++) {
+                        const item = document.createElement('span');
+                        item.className = 'koala-item';
+                        item.textContent = '🐨';
+                        itemsEl.appendChild(item);
+                    }
+                    card.appendChild(itemsEl);
+
+                    card.addEventListener('click', () => handleCardClick(player.score, players));
+                    comparisonArea.appendChild(card);
+                });
+            }
+
+            function handleCardClick(clickedScore, players) {
+                const maxScore = Math.max(...players.map(p => p.score));
+                if (clickedScore === maxScore) {
+                    completionMessage.innerHTML = "정답! 5는 3보다 크니까 코알라가 승리했어! 👑";
+                    document.querySelectorAll('.player-card').forEach(card => {
+                        card.classList.add('disabled');
+                        if (card.querySelector('.card-number').textContent == clickedScore) {
+                            card.classList.add('winner');
+                        }
+                    });
+                } else {
+                    completionMessage.textContent = "음.. 다시 생각해볼까? 어떤 그룹에 코알라가 더 많지? 🤔";
+                }
+            }
+
+            function checkPuzzle() {
+                let allCorrect = true;
+                const zones = document.querySelectorAll('#puzzle-board .drop-zone');
+                if (zones.length !== totalDropZones || Array.from(zones).some(z => !z.querySelector('.piece'))) {
+                    completionMessage.innerHTML = '앗! 아직 빈 칸이 있어요!<br>모든 조각을 옮겨주세요! 😊🐨';
+                    activityArea.style.display = 'none';
+                    openModal();
+                    return;
+                }
+                zones.forEach(zone => {
+                    if (zone.dataset.expectedStep !== zone.children[0].dataset.step) {
+                        allCorrect = false;
+                    }
+                });
+
+                if (allCorrect) {
+                    completionMessage.innerHTML = '정답이야! 🥳<br>어떤 숫자가 더 클까? 카드를 눌러 승자를 골라봐!';
+                    activityArea.style.display = 'block';
+                    setupComparisonActivity();
+                } else {
+                    completionMessage.innerHTML = '아직 순서가 맞지 않아요.<br>다시 한번 확인해보세요! 🤔🐨';
+                    activityArea.style.display = 'none';
+                }
+                openModal();
+            }
+
+            function openModal() { resultModal.style.display = "flex"; }
+            function closeModal() { resultModal.style.display = "none"; }
+
+            closeModalButton.addEventListener('click', closeModal);
+            window.addEventListener('click', e => { if (e.target === resultModal) closeModal(); });
+            checkButton.addEventListener('click', checkPuzzle);
+            resetButton.addEventListener('click', initializePuzzle);
+
+            initializePuzzle();
+        });
+    </script>
+</body>
+</html>

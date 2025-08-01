@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>15회차 - 나만의 규칙 만들기</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            margin-top: 30px; background: linear-gradient(135deg, #ffd1dc 0%, #ffecb3 100%);
+            min-height: 100vh; box-sizing: border-box;
+        }
+        *, *::before, *::after { box-sizing: inherit; }
+        .container {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; margin-bottom: 30px;
+        }
+        #puzzle-pieces, #puzzle-board {
+            width: 360px; padding: 25px; background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 25px; box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            min-height: 550px;
+        }
+        #puzzle-pieces h2, #puzzle-board h2 {
+            text-align: center; margin-top: 0; color: #e91e63; margin-bottom: 20px;
+            font-family: 'Nanum Pen Script', cursive; font-size: 2.8em; font-weight: 400;
+            text-shadow: 1px 1px 0px #fff, 2px 2px 0px rgba(0,0,0,0.1);
+        }
+        .piece {
+            background-color: #81c784; color: #333; margin-bottom: 15px; border-radius: 18px;
+            cursor: grab; box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            width: 100%; height: 85px; display: flex; align-items: center; justify-content: center;
+            padding: 10px; font-family: 'Gaegu', cursive; font-size: 1.1em;
+            text-align: center; font-weight: 700; border: 3px solid rgba(255,255,255,0.7);
+        }
+        .piece.dragging { opacity: 0.6; transform: scale(1.08) rotate(2deg); }
+        .piece[data-step="1"] {
+            background-color: #ffd54f; color: #6D4C41; clip-path: polygon(85% 0%, 15% 0%, 0% 50%, 15% 100%, 85% 100%, 100% 50%);
+            border-radius: 0; border: none;
+        }
+        .piece[data-step="5"] {
+            background-color: #ffab91; color: #BF360C; clip-path: url(#wavyOutputClip);
+            border-radius: 0; border: none;
+        }
+        .drop-zone {
+            background-color: rgba(255, 255, 255, 0.6); color: #78909c; margin-bottom: 15px;
+            border: 3px dashed #ffbad1; border-radius: 18px; text-align: center;
+            width: 100%; height: 85px; display: flex; justify-content: center; align-items: center;
+            transition: all 0.2s ease; font-family: 'Gaegu', cursive; font-size: 1.2em; font-weight: 700;
+        }
+        .drop-zone.over { background-color: #c8e6c9; border-color: #81c784; }
+        .drop-zone.filled { background-color: transparent; border-style: solid; border-color: #ecf1f1; padding: 0; }
+        .drop-zone.filled .piece { width: 100%; height: 100%; margin: 0; box-shadow: none; cursor: default; }
+        .drop-zone.filled .piece:not([data-step="1"]):not([data-step="5"]) { border: none; }
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background-color: #fff0f5; margin: auto; padding: 25px; border: 5px solid #ffb6c1;
+            width: 90%; max-width: 500px; border-radius: 20px; position: relative; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: 'Gaegu', cursive; font-size: 1.2em;
+        }
+        .close-button {
+            color: #e91e63; position: absolute; top: 10px; right: 15px; font-size: 35px;
+            font-weight: bold; transition: transform 0.2s ease; cursor: pointer;
+        }
+        .close-button:hover, .close-button:focus { color: #ad1457; transform: scale(1.1); }
+        
+        #activity-area { display: none; margin-top: 15px; }
+        .activity-section {
+            background: #fffde7; border: 3px solid #fbc02d; border-radius: 10px;
+            padding: 15px; margin-bottom: 20px;
+        }
+        .activity-section h4 { margin: 0 0 10px 0; font-size: 1.3em; color: #e91e63; }
+        
+        .pattern-display { display: flex; justify-content: center; align-items: center; gap: 10px; }
+        .pattern-item, .choice-item, .pattern-slot {
+            font-size: 2.5em; width: 60px; height: 60px;
+            display: flex; align-items: center; justify-content: center;
+            background-color: #fff; border-radius: 10px;
+        }
+        .pattern-slot {
+            border: 3px dashed #bdbdbd; color: #bdbdbd; font-family: 'Gaegu'; font-size: 2em;
+        }
+        .pattern-slot.over { background-color: #eee; }
+        .pattern-slot.filled { border-style: solid; border-color: #69f0ae; color: initial; }
+
+        #choices-display { flex-wrap: wrap; }
+        .choice-item { cursor: grab; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .choice-item.dragging { opacity: 0.4; }
+
+        #action-button {
+            padding: 14px 28px; font-size: 1.2em; color: white; background-color: #29b6f6;
+            border: none; border-radius: 30px; cursor: pointer; transition: all 0.2s ease;
+            box-shadow: 0 4px 0 #039be5;
+        }
+        .hidden { display: none !important; }
+
+        #completion-message {
+            font-size: 1.6em; color: #4CAF50; font-weight: bold; text-align: center;
+            margin-bottom: 15px; line-height: 1.4;
+        }
+        #check-button, #reset-button {
+            padding: 14px 28px; font-size: 1.2em; color: white; background-color: #ff9800;
+            border: none; border-radius: 30px; cursor: pointer;
+            margin-top: 15px; box-shadow: 0 4px 0 #e68a00; text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            font-family: 'Gaegu', cursive; font-weight: 700;
+        }
+        #reset-button { background-color: #f44336; box-shadow: 0 4px 0 #d32f2f; margin-left: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="puzzle-pieces"><h2>조각 상자</h2></div>
+        <div id="puzzle-board"><h2>순서 맞추기</h2></div>
+    </div>
+    <div class="controls">
+        <button id="check-button">확인하기</button>
+        <button id="reset-button">다시 시작</button>
+    </div>
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">×</span>
+            <p id="completion-message"></p>
+            <div id="activity-area">
+                <div id="teacher-problem-area">
+                    <div class="activity-section">
+                        <h4>선생님 문제</h4>
+                        <div id="sequence-display" class="pattern-display"></div>
+                    </div>
+                    <div class="activity-section">
+                        <h4>패턴 조각</h4>
+                        <div id="choices-display" class="pattern-display"></div>
+                    </div>
+                </div>
+                <div id="student-creation-area" class="hidden">
+                     <div class="activity-section">
+                        <h4>나만의 규칙 만들기</h4>
+                        <div id="creation-slots" class="pattern-display"></div>
+                    </div>
+                    <div class="activity-section">
+                        <h4>패턴 조각</h4>
+                        <div id="creation-choices" class="pattern-display"></div>
+                    </div>
+                </div>
+                <button id="action-button" class="hidden">문제 만들기</button>
+            </div>
+        </div>
+    </div>
+    <svg class="hidden-svg">
+      <defs>
+        <clipPath id="wavyOutputClip" clipPathUnits="objectBoundingBox">
+          <path d="M1,0 L0,0 L0,0.8 Q0.25 1.15 0.5 0.8 T1 0.8 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const puzzlePiecesContainer = document.getElementById('puzzle-pieces');
+            const puzzleBoardContainer = document.getElementById('puzzle-board');
+            
+            const pieceData = [
+                { text: "선생님이 보여주는 패턴을 확인해요.", step: "1" },
+                { text: "어떤 규칙을 가지는지 이야기해봅시다.", step: "2" },
+                { text: "규칙을 알았다면 빈칸을 채워보아요.", step: "3" },
+                { text: "친구들과 정답을 검사해요.", step: "4" },
+                { text: "나만의 규칙문제를 만들어보아요!", step: "5" }
+            ];
+            const totalDropZones = 5;
+
+            const checkButton = document.getElementById('check-button');
+            const resetButton = document.getElementById('reset-button');
+            const resultModal = document.getElementById('result-modal');
+            const closeModalButton = resultModal.querySelector('.close-button');
+            const completionMessage = document.getElementById('completion-message');
+            const activityArea = document.getElementById('activity-area');
+            const actionButton = document.getElementById('action-button');
+            
+            let draggedPiece = null;
+            let draggedChoice = null;
+
+            function initializePuzzle() {
+                puzzleBoardContainer.innerHTML = '<h2>순서 맞추기</h2>';
+                puzzlePiecesContainer.innerHTML = '<h2>조각 상자</h2>';
+                for (let i = 1; i <= totalDropZones; i++) {
+                    const zone = document.createElement('div');
+                    zone.className = 'drop-zone';
+                    zone.dataset.expectedStep = i;
+                    zone.textContent = `${i}단계`;
+                    puzzleBoardContainer.appendChild(zone);
+                }
+                let piecesToShuffle = pieceData.map(data => createPiece(data));
+                shuffleArray(piecesToShuffle);
+                piecesToShuffle.forEach(piece => puzzlePiecesContainer.appendChild(piece));
+                addPuzzleDragListeners();
+                activityArea.style.display = 'none';
+                actionButton.classList.add('hidden');
+                closeModal();
+            }
+            function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[array[i], array[j]] = [array[j], array[i]]; } }
+            function createPiece(data) {
+                const piece = document.createElement('div');
+                piece.className = 'piece';
+                piece.textContent = data.text;
+                piece.draggable = true;
+                piece.dataset.step = data.step;
+                return piece;
+            }
+            function handlePuzzleDragStart(e) { if (e.target.classList.contains('piece')) { draggedPiece = e.target; setTimeout(() => e.target.classList.add('dragging'), 0); } }
+            function handlePuzzleDragEnd(e) { if (e.target.classList.contains('piece')) { e.target.classList.remove('dragging'); draggedPiece = null; } }
+            function handlePuzzleDragOver(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (target && target.classList.contains('drop-zone') && !target.querySelector('.piece')) {
+                    target.classList.add('over');
+                }
+            }
+            function handlePuzzleDragLeave(e) { e.target.closest('.drop-zone, #puzzle-pieces')?.classList.remove('over'); }
+            function handlePuzzleDrop(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (!target || !draggedPiece) return;
+                target.classList.remove('over');
+                if (target.id === 'puzzle-pieces' || !target.querySelector('.piece')) {
+                    if (draggedPiece.parentElement.classList.contains('drop-zone')) {
+                        const oldZone = draggedPiece.parentElement;
+                        oldZone.textContent = `${oldZone.dataset.expectedStep}단계`;
+                        oldZone.classList.remove('filled');
+                    }
+                    if(target.id === 'puzzle-pieces') puzzlePiecesContainer.appendChild(draggedPiece);
+                    else { target.innerHTML = ''; target.appendChild(draggedPiece); target.classList.add('filled'); }
+                }
+            }
+            function addPuzzleDragListeners() {
+                const elements = document.querySelectorAll('.piece, .drop-zone, #puzzle-pieces');
+                elements.forEach(el => {
+                    el.addEventListener('dragstart', handlePuzzleDragStart);
+                    el.addEventListener('dragend', handlePuzzleDragEnd);
+                    el.addEventListener('dragover', handlePuzzleDragOver);
+                    el.addEventListener('dragleave', handlePuzzleDragLeave);
+                    el.addEventListener('drop', handlePuzzleDrop);
+                });
+            }
+
+            // ==========================================================
+            // ===               ★★★ 여기가 핵심 수정 ★★★            ===
+            // ==========================================================
+            function setupTeacherProblem() {
+                document.getElementById('teacher-problem-area').classList.remove('hidden');
+                document.getElementById('student-creation-area').classList.add('hidden');
+                
+                const sequenceDisplay = document.getElementById('sequence-display');
+                const choicesDisplay = document.getElementById('choices-display');
+                sequenceDisplay.innerHTML = '';
+                choicesDisplay.innerHTML = '';
+
+                const problem = {
+                    sequence: ['🌙', '⭐', 'BLANK'],
+                    choices: ['☀️', '☁️', '🌈'],
+                    correctAnswer: '☀️'
+                };
+                
+                problem.sequence.forEach(item => {
+                    if (item === 'BLANK') {
+                        sequenceDisplay.innerHTML += `<div id="blank-space" class="pattern-slot">?</div>`;
+                    } else {
+                        sequenceDisplay.innerHTML += `<div class="pattern-item">${item}</div>`;
+                    }
+                });
+
+                shuffleArray(problem.choices);
+                problem.choices.forEach(item => {
+                    const choiceEl = document.createElement('div');
+                    choiceEl.className = 'choice-item';
+                    choiceEl.textContent = item;
+                    choiceEl.draggable = true;
+                    choiceEl.dataset.value = item;
+                    choiceEl.addEventListener('dragstart', e => { draggedChoice = e.target; });
+                    choicesDisplay.appendChild(choiceEl);
+                });
+                
+                const blankSpace = document.getElementById('blank-space');
+                blankSpace.addEventListener('dragover', e => { e.preventDefault(); blankSpace.classList.add('over'); });
+                blankSpace.addEventListener('dragleave', () => blankSpace.classList.remove('over'));
+                blankSpace.addEventListener('drop', e => {
+                    e.preventDefault();
+                    blankSpace.classList.remove('over');
+                    if (!draggedChoice) return;
+
+                    if (draggedChoice.dataset.value === problem.correctAnswer) {
+                        blankSpace.textContent = draggedChoice.dataset.value;
+                        blankSpace.classList.add('filled');
+                        completionMessage.innerHTML = '정답! 친구들과 확인해봐도 똑같을 거야! ✅';
+                        document.querySelectorAll('.choice-item').forEach(item => item.draggable = false);
+                        actionButton.classList.remove('hidden');
+                        actionButton.onclick = setupStudentCreation;
+                    } else {
+                        completionMessage.textContent = '음, 그건 아닌 것 같아. 다시 생각해볼까?';
+                    }
+                });
+            }
+
+            function setupStudentCreation() {
+                document.getElementById('teacher-problem-area').classList.add('hidden');
+                document.getElementById('student-creation-area').classList.remove('hidden');
+                actionButton.classList.add('hidden');
+                completionMessage.innerHTML = '이제 우리 팀만의 새로운 규칙을 만들어보자!';
+
+                const creationSlots = document.getElementById('creation-slots');
+                const creationChoices = document.getElementById('creation-choices');
+                creationSlots.innerHTML = '<div class="pattern-slot"></div><div class="pattern-slot"></div><div class="pattern-slot"></div>';
+                creationChoices.innerHTML = '';
+
+                const choices = ['🍓', '🍌', '🍉', '🥝', '🍑'];
+                choices.forEach(item => {
+                    const choiceEl = document.createElement('div');
+                    choiceEl.className = 'choice-item';
+                    choiceEl.textContent = item;
+                    choiceEl.draggable = true;
+                    choiceEl.addEventListener('dragstart', e => { draggedChoice = e.target; });
+                    creationChoices.appendChild(choiceEl);
+                });
+
+                document.querySelectorAll('#creation-slots .pattern-slot').forEach(slot => {
+                    slot.addEventListener('dragover', e => { e.preventDefault(); if(!slot.classList.contains('filled')) slot.classList.add('over'); });
+                    slot.addEventListener('dragleave', e => slot.classList.remove('over'));
+                    slot.addEventListener('drop', e => {
+                        e.preventDefault();
+                        slot.classList.remove('over');
+                        if (draggedChoice && !slot.classList.contains('filled')) {
+                            slot.textContent = draggedChoice.textContent;
+                            slot.classList.add('filled');
+                            draggedChoice.remove();
+
+                            if (document.querySelectorAll('#creation-slots .filled').length === 3) {
+                                completionMessage.innerHTML = '멋진 규칙이야! 이제 이 규칙으로 친구들에게 문제를 내볼까? 🤩';
+                            }
+                        }
+                    });
+                });
+            }
+
+            function checkPuzzle() {
+                let allCorrect = true;
+                const zones = document.querySelectorAll('#puzzle-board .drop-zone');
+                if (zones.length !== totalDropZones || Array.from(zones).some(z => !z.querySelector('.piece'))) {
+                    completionMessage.innerHTML = '앗! 아직 빈 칸이 있어요!<br>모든 조각을 옮겨주세요! 😊🐨';
+                    activityArea.style.display = 'none';
+                    openModal();
+                    return;
+                }
+                zones.forEach(zone => { if (zone.dataset.expectedStep !== zone.children[0].dataset.step) allCorrect = false; });
+                
+                if (allCorrect) {
+                    completionMessage.innerHTML = '정답이야! 🥳<br>빈칸에 알맞은 조각을 옮겨 패턴을 완성해보자!';
+                    activityArea.style.display = 'block';
+                    setupTeacherProblem();
+                } else {
+                    completionMessage.innerHTML = '아직 순서가 맞지 않아요.<br>다시 한번 확인해보세요! 🤔🐨';
+                    activityArea.style.display = 'none';
+                }
+                openModal();
+            }
+
+            function openModal() { resultModal.style.display = "flex"; }
+            function closeModal() { resultModal.style.display = "none"; }
+
+            closeModalButton.addEventListener('click', closeModal);
+            window.addEventListener('click', e => { if (e.target === resultModal) closeModal(); });
+            checkButton.addEventListener('click', checkPuzzle);
+            resetButton.addEventListener('click', initializePuzzle);
+
+            initializePuzzle();
+        });
+    </script>
+</body>
+</html>

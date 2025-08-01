@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7회차 - 길이를 재어봐요</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 30px;
+            background: linear-gradient(135deg, #ffd1dc 0%, #ffecb3 100%);
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        *, *::before, *::after {
+            box-sizing: inherit;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        #puzzle-pieces, #puzzle-board {
+            width: 360px;
+            padding: 25px;
+            background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 25px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+        #puzzle-pieces h2, #puzzle-board h2 {
+            text-align: center;
+            margin-top: 0;
+            color: #e91e63;
+            margin-bottom: 20px;
+            font-family: 'Nanum Pen Script', cursive;
+            font-size: 2.8em;
+            font-weight: 400;
+            text-shadow: 1px 1px 0px #fff, 2px 2px 0px rgba(0,0,0,0.1);
+        }
+
+        .piece {
+            background-color: #81c784;
+            color: #333;
+            margin-bottom: 15px;
+            border-radius: 18px;
+            cursor: grab;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+            transition: transform 0.15s ease-in-out, background-color 0.2s ease, clip-path 0.2s ease, box-shadow 0.2s ease, opacity 0.15s ease-in-out;
+            width: 100%;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            font-family: 'Gaegu', cursive;
+            font-size: 1.1em;
+            text-align: center;
+            font-weight: 700;
+            border: 3px solid rgba(255,255,255,0.7);
+        }
+
+        .piece.dragging { opacity: 0.6; transform: scale(1.08) rotate(2deg); }
+
+        .piece[data-step="1"] {
+            background-color: #ffd54f;
+            color: #6D4C41;
+            clip-path: polygon(85% 0%, 15% 0%, 0% 50%, 15% 100%, 85% 100%, 100% 50%);
+            border-radius: 0;
+            border: none;
+        }
+        .piece[data-step="2"], .piece[data-step="3"] {}
+        .piece[data-step="4"] {
+            background-color: #ffab91;
+            color: #BF360C;
+            clip-path: url(#wavyOutputClip);
+            border-radius: 0;
+            border: none;
+        }
+
+        .drop-zone {
+            background-color: rgba(255, 255, 255, 0.6);
+            color: #78909c;
+            margin-bottom: 15px;
+            border: 3px dashed #ffbad1;
+            border-radius: 18px;
+            text-align: center;
+            width: 100%;
+            height: 80px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            font-family: 'Gaegu', cursive;
+            font-size: 1.2em;
+            font-weight: 700;
+        }
+
+        .drop-zone.over { background-color: #c8e6c9; border-color: #81c784; }
+
+        .drop-zone.filled {
+            background-color: transparent; border-style: solid;
+            border-color: #ecf1f1; padding: 0;
+        }
+        .drop-zone.filled .piece {
+            width: 100%; height: 100%; margin: 0; box-shadow: none; cursor: default;
+        }
+        .drop-zone.filled .piece:not([data-step="1"]):not([data-step="4"]) {
+             border: none;
+        }
+
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background-color: #fff0f5; margin: auto; padding: 25px; border: 5px solid #ffb6c1;
+            width: 90%; max-width: 520px; border-radius: 20px; position: relative; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: 'Gaegu', cursive; font-size: 1.2em;
+        }
+        .close-button {
+            color: #e91e63; position: absolute; top: 10px; right: 15px; font-size: 35px;
+            font-weight: bold; transition: transform 0.2s ease; cursor: pointer;
+        }
+        .close-button:hover, .close-button:focus { color: #ad1457; transform: scale(1.1); }
+        
+        #activity-area { display: none; margin-top: 15px; }
+        #target-length-display {
+            background-color: #e3f2fd;
+            border: 2px solid #90caf9;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #1565c0;
+            margin-bottom: 20px;
+        }
+
+        #comparison-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .student-card {
+            background-color: #fff;
+            border: 4px solid #ffca28;
+            border-radius: 15px;
+            padding: 10px 15px;
+            width: 90%;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .student-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.15); }
+        .student-card.winner {
+            border-color: #69f0ae; box-shadow: 0 0 20px rgba(105, 240, 174, 0.8);
+        }
+        .student-card.winner::after {
+            content: '🥇';
+            position: absolute;
+            top: 50%; right: -25px;
+            transform: translateY(-50%);
+            font-size: 2em;
+        }
+        .student-card.disabled { pointer-events: none; opacity: 0.8; }
+        .student-info { text-align: left; }
+        .student-name { font-size: 1.2em; font-weight: 700; color: #c2185b; }
+        .measured-length { font-size: 1.1em; color: #555; }
+        
+        .ruler-visual {
+            height: 20px;
+            background-color: #fff59d;
+            border: 2px solid #fbc02d;
+            border-radius: 5px;
+            position: relative;
+            /* 자 눈금 효과 */
+            background-image: repeating-linear-gradient(90deg, #fbc02d, #fbc02d 1px, transparent 1px, transparent 10px);
+        }
+        
+        #completion-message {
+            font-size: 1.6em; color: #4CAF50; font-weight: bold; text-align: center;
+            margin-bottom: 15px; line-height: 1.4;
+        }
+        #check-button, #reset-button {
+            padding: 14px 28px; font-size: 1.2em; color: white; background-color: #ff9800;
+            border: none; border-radius: 30px; cursor: pointer; transition: background-color 0.2s ease;
+            margin-top: 15px; box-shadow: 0 4px 0 #e68a00; text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            font-family: 'Gaegu', cursive; font-weight: 700;
+        }
+        #reset-button { background-color: #f44336; box-shadow: 0 4px 0 #d32f2f; margin-left: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="puzzle-pieces"><h2>조각 상자</h2></div>
+        <div id="puzzle-board"><h2>순서 맞추기</h2></div>
+    </div>
+    <div class="controls">
+        <button id="check-button">확인하기</button>
+        <button id="reset-button">다시 시작</button>
+    </div>
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">×</span>
+            <p id="completion-message"></p>
+            <div id="activity-area">
+                <div id="target-length-display"></div>
+                <div id="comparison-area"></div>
+            </div>
+        </div>
+    </div>
+    <svg class="hidden-svg">
+      <defs>
+        <clipPath id="wavyOutputClip" clipPathUnits="objectBoundingBox">
+          <path d="M1,0 L0,0 L0,0.8 Q0.25 1.15 0.5 0.8 T1 0.8 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const puzzlePiecesContainer = document.getElementById('puzzle-pieces');
+            const puzzleBoardContainer = document.getElementById('puzzle-board');
+            
+            const pieceData = [
+                { text: "자를 준비해요", step: "1" },
+                { text: "내 물건들의 길이를 재요", step: "2" },
+                { text: "길이를 책에 적어두어요", step: "3" },
+                { text: "선생님이 뽑은 길이와 가장 가까운 길이는 누굴까?", step: "4" }
+            ];
+            const totalDropZones = 4;
+
+            const checkButton = document.getElementById('check-button');
+            const resetButton = document.getElementById('reset-button');
+            const resultModal = document.getElementById('result-modal');
+            const closeModalButton = resultModal.querySelector('.close-button');
+            const completionMessage = document.getElementById('completion-message');
+            const activityArea = document.getElementById('activity-area');
+            const targetLengthDisplay = document.getElementById('target-length-display');
+            const comparisonArea = document.getElementById('comparison-area');
+
+            let draggedPiece = null;
+
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+
+            function initializePuzzle() {
+                puzzleBoardContainer.innerHTML = '<h2>순서 맞추기</h2>';
+                puzzlePiecesContainer.innerHTML = '<h2>조각 상자</h2>';
+                for (let i = 1; i <= totalDropZones; i++) {
+                    const zone = document.createElement('div');
+                    zone.className = 'drop-zone';
+                    zone.dataset.expectedStep = i;
+                    zone.textContent = `${i}단계`;
+                    puzzleBoardContainer.appendChild(zone);
+                }
+                let piecesToShuffle = pieceData.map(data => createPiece(data));
+                shuffleArray(piecesToShuffle);
+                piecesToShuffle.forEach(piece => puzzlePiecesContainer.appendChild(piece));
+                addDragEventListeners();
+                activityArea.style.display = 'none';
+                closeModal();
+            }
+
+            function createPiece(data) {
+                const piece = document.createElement('div');
+                piece.className = 'piece';
+                piece.textContent = data.text;
+                piece.draggable = true;
+                piece.dataset.step = data.step;
+                return piece;
+            }
+
+            function handleDragStart(e) { if (e.target.classList.contains('piece')) { draggedPiece = e.target; setTimeout(() => e.target.classList.add('dragging'), 0); } }
+            function handleDragEnd(e) { if (e.target.classList.contains('piece')) { e.target.classList.remove('dragging'); draggedPiece = null; } }
+            function handleDragOver(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (target && target.classList.contains('drop-zone') && !target.querySelector('.piece')) {
+                    target.classList.add('over');
+                }
+            }
+            function handleDragLeave(e) { e.target.closest('.drop-zone, #puzzle-pieces')?.classList.remove('over'); }
+            function handleDrop(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (!target || !draggedPiece) return;
+                target.classList.remove('over');
+                
+                if (target.id === 'puzzle-pieces' || !target.querySelector('.piece')) {
+                    if (draggedPiece.parentElement.classList.contains('drop-zone')) {
+                        const oldZone = draggedPiece.parentElement;
+                        oldZone.textContent = `${oldZone.dataset.expectedStep}단계`;
+                        oldZone.classList.remove('filled');
+                    }
+                    if(target.id === 'puzzle-pieces') puzzlePiecesContainer.appendChild(draggedPiece);
+                    else { target.innerHTML = ''; target.appendChild(draggedPiece); target.classList.add('filled'); }
+                }
+            }
+
+            function addDragEventListeners() {
+                const elements = document.querySelectorAll('.piece, .drop-zone, #puzzle-pieces');
+                elements.forEach(el => {
+                    el.addEventListener('dragstart', handleDragStart);
+                    el.addEventListener('dragend', handleDragEnd);
+                    el.addEventListener('dragover', handleDragOver);
+                    el.addEventListener('dragleave', handleDragLeave);
+                    el.addEventListener('drop', handleDrop);
+                });
+            }
+
+            // ==========================================================
+            // ===               ★★★ 여기가 핵심 수정 ★★★            ===
+            // ==========================================================
+            function setupComparisonActivity() {
+                comparisonArea.innerHTML = '';
+                const targetLength = 10;
+                const students = [
+                    { name: '코알라', length: 8 },
+                    { name: '토끼', length: 13 },
+                    { name: '쿼카', length: 6 }
+                ];
+                
+                targetLengthDisplay.innerHTML = `선생님이 뽑은 길이는 <strong>${targetLength}cm</strong>야!`;
+
+                students.forEach(student => {
+                    const card = document.createElement('div');
+                    card.className = 'student-card';
+                    card.dataset.length = student.length;
+
+                    const info = document.createElement('div');
+                    info.className = 'student-info';
+                    
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'student-name';
+                    nameEl.textContent = student.name;
+                    info.appendChild(nameEl);
+
+                    const lengthEl = document.createElement('div');
+                    lengthEl.className = 'measured-length';
+                    lengthEl.textContent = `${student.length}cm`;
+                    info.appendChild(lengthEl);
+
+                    const ruler = document.createElement('div');
+                    ruler.className = 'ruler-visual';
+                    ruler.style.width = `${student.length * 15}px`; // 시각적 길이를 위한 스케일 조정
+                    
+                    card.appendChild(info);
+                    card.appendChild(ruler);
+
+                    card.addEventListener('click', () => handleCardClick(student, targetLength, students));
+                    comparisonArea.appendChild(card);
+                });
+            }
+
+            function handleCardClick(clickedStudent, target, allStudents) {
+                // 가장 가까운 값을 찾기
+                let closest = allStudents.reduce((prev, curr) => {
+                    return (Math.abs(curr.length - target) < Math.abs(prev.length - target) ? curr : prev);
+                });
+
+                if (clickedStudent.length === closest.length) {
+                    completionMessage.innerHTML = `정답! ${target}cm와 가장 가까운 길이는 코알라의 8cm야!`;
+                    document.querySelectorAll('.student-card').forEach(card => {
+                        card.classList.add('disabled');
+                        if (parseInt(card.dataset.length) === clickedStudent.length) {
+                            card.classList.add('winner');
+                        }
+                    });
+                } else {
+                    completionMessage.textContent = "음.. 다시 생각해볼까? 누가 잰 길이가 10cm와 가장 가까울까? 🤔";
+                }
+            }
+
+            function checkPuzzle() {
+                let allCorrect = true;
+                const zones = document.querySelectorAll('#puzzle-board .drop-zone');
+                if (zones.length !== totalDropZones || Array.from(zones).some(z => !z.querySelector('.piece'))) {
+                    completionMessage.innerHTML = '앗! 아직 빈 칸이 있어요!<br>모든 조각을 옮겨주세요! 😊🐨';
+                    activityArea.style.display = 'none';
+                    openModal();
+                    return;
+                }
+                zones.forEach(zone => {
+                    if (zone.dataset.expectedStep !== zone.children[0].dataset.step) {
+                        allCorrect = false;
+                    }
+                });
+
+                if (allCorrect) {
+                    completionMessage.innerHTML = '정답이야! 🥳<br>누가 잰 길이가 10cm에 가장 가까울까?';
+                    activityArea.style.display = 'block';
+                    setupComparisonActivity();
+                } else {
+                    completionMessage.innerHTML = '아직 순서가 맞지 않아요.<br>다시 한번 확인해보세요! 🤔🐨';
+                    activityArea.style.display = 'none';
+                }
+                openModal();
+            }
+
+            function openModal() { resultModal.style.display = "flex"; }
+            function closeModal() { resultModal.style.display = "none"; }
+
+            closeModalButton.addEventListener('click', closeModal);
+            window.addEventListener('click', e => { if (e.target === resultModal) closeModal(); });
+            checkButton.addEventListener('click', checkPuzzle);
+            resetButton.addEventListener('click', initializePuzzle);
+
+            initializePuzzle();
+        });
+    </script>
+</body>
+</html>

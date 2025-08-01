@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8회차 - 케이크 만들기</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 30px;
+            background: linear-gradient(135deg, #ffd1dc 0%, #ffecb3 100%);
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        *, *::before, *::after { box-sizing: inherit; }
+
+        .container {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; margin-bottom: 30px;
+        }
+
+        #puzzle-pieces, #puzzle-board {
+            width: 360px; padding: 25px; background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 25px; box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+        #puzzle-pieces h2, #puzzle-board h2 {
+            text-align: center; margin-top: 0; color: #e91e63; margin-bottom: 20px;
+            font-family: 'Nanum Pen Script', cursive; font-size: 2.8em; font-weight: 400;
+            text-shadow: 1px 1px 0px #fff, 2px 2px 0px rgba(0,0,0,0.1);
+        }
+
+        .piece {
+            background-color: #81c784; color: #333; margin-bottom: 15px; border-radius: 18px;
+            cursor: grab; box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            width: 100%; height: 80px; display: flex; align-items: center; justify-content: center;
+            padding: 15px; font-family: 'Gaegu', cursive; font-size: 1.1em; text-align: center;
+            font-weight: 700; border: 3px solid rgba(255,255,255,0.7);
+        }
+
+        .piece.dragging { opacity: 0.6; transform: scale(1.08) rotate(2deg); }
+
+        .piece[data-step="1"] {
+            background-color: #ffd54f; color: #6D4C41; clip-path: polygon(85% 0%, 15% 0%, 0% 50%, 15% 100%, 85% 100%, 100% 50%);
+            border-radius: 0; border: none;
+        }
+        .piece[data-step="4"] {
+            background-color: #ffab91; color: #BF360C; clip-path: url(#wavyOutputClip);
+            border-radius: 0; border: none;
+        }
+
+        .drop-zone {
+            background-color: rgba(255, 255, 255, 0.6); color: #78909c; margin-bottom: 15px;
+            border: 3px dashed #ffbad1; border-radius: 18px; text-align: center;
+            width: 100%; height: 80px; display: flex; justify-content: center; align-items: center;
+            transition: all 0.2s ease; font-family: 'Gaegu', cursive; font-size: 1.2em; font-weight: 700;
+        }
+
+        .drop-zone.over { background-color: #c8e6c9; border-color: #81c784; }
+        .drop-zone.filled { background-color: transparent; border-style: solid; border-color: #ecf1f1; padding: 0; }
+        .drop-zone.filled .piece { width: 100%; height: 100%; margin: 0; box-shadow: none; cursor: default; }
+        .drop-zone.filled .piece:not([data-step="1"]):not([data-step="4"]) { border: none; }
+
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background-color: #fff0f5; margin: auto; padding: 25px; border: 5px solid #ffb6c1;
+            width: 90%; max-width: 480px; border-radius: 20px; position: relative; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: 'Gaegu', cursive; font-size: 1.2em;
+        }
+        .close-button {
+            color: #e91e63; position: absolute; top: 10px; right: 15px; font-size: 35px;
+            font-weight: bold; transition: transform 0.2s ease; cursor: pointer;
+        }
+        .close-button:hover, .close-button:focus { color: #ad1457; transform: scale(1.1); }
+        
+        /* --- 케이크 만들기 활동 --- */
+        #activity-area { display: none; margin-top: 15px; }
+        #cake-display-area {
+            background-color: #f1f8e9;
+            width: 250px; height: 180px;
+            margin: 0 auto;
+            border-bottom: 10px solid #c5e1a5;
+            border-radius: 50% / 20%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #cake-display-area.over { background-color: #dcedc8; }
+        .cake-layer { position: absolute; bottom: 10px; transition: opacity 0.5s ease; opacity: 0; }
+        .cake-layer.visible { opacity: 1; }
+        
+        #cake-bread {
+            width: 180px; height: 80px; background-color: #a1887f;
+            border-radius: 10px 10px 0 0;
+        }
+        #cake-cream {
+            width: 180px; height: 85px; background-color: #fff;
+            clip-path: polygon(0 15%, 10% 5%, 20% 15%, 30% 8%, 40% 18%, 50% 10%, 60% 20%, 70% 12%, 80% 22%, 90% 15%, 100% 25%, 100% 100%, 0% 100%);
+        }
+        #cake-toppings {
+            width: 180px; height: 85px;
+            display: flex; justify-content: center; align-items: flex-start; gap: 15px;
+            padding-top: 25px;
+        }
+        .topping { width: 25px; height: 25px; background-color: #4e342e; border-radius: 5px; }
+
+        #toolbox-area {
+            margin-top: 20px; padding: 15px; background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 15px; display: flex; justify-content: center; gap: 20px;
+        }
+        .tool-item {
+            font-size: 3em; cursor: grab; transition: transform 0.2s ease, opacity 0.2s;
+        }
+        .tool-item.disabled { cursor: not-allowed; opacity: 0.3; }
+
+        #completion-message {
+            font-size: 1.6em; color: #4CAF50; font-weight: bold; text-align: center;
+            margin-bottom: 15px; line-height: 1.4;
+        }
+        #check-button, #reset-button {
+            padding: 14px 28px; font-size: 1.2em; color: white; background-color: #ff9800;
+            border: none; border-radius: 30px; cursor: pointer; transition: background-color 0.2s ease;
+            margin-top: 15px; box-shadow: 0 4px 0 #e68a00; text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            font-family: 'Gaegu', cursive; font-weight: 700;
+        }
+        #reset-button { background-color: #f44336; box-shadow: 0 4px 0 #d32f2f; margin-left: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="puzzle-pieces"><h2>조각 상자</h2></div>
+        <div id="puzzle-board"><h2>순서 맞추기</h2></div>
+    </div>
+    <div class="controls">
+        <button id="check-button">확인하기</button>
+        <button id="reset-button">다시 시작</button>
+    </div>
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">×</span>
+            <p id="completion-message"></p>
+            <div id="activity-area">
+                <div id="cake-display-area">
+                    <div id="cake-bread" class="cake-layer"></div>
+                    <div id="cake-cream" class="cake-layer"></div>
+                    <div id="cake-toppings" class="cake-layer">
+                        <div class="topping"></div><div class="topping"></div><div class="topping"></div>
+                    </div>
+                </div>
+                <div id="toolbox-area"></div>
+            </div>
+        </div>
+    </div>
+    <svg class="hidden-svg">
+      <defs>
+        <clipPath id="wavyOutputClip" clipPathUnits="objectBoundingBox">
+          <path d="M1,0 L0,0 L0,0.8 Q0.25 1.15 0.5 0.8 T1 0.8 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const puzzlePiecesContainer = document.getElementById('puzzle-pieces');
+            const puzzleBoardContainer = document.getElementById('puzzle-board');
+            
+            const pieceData = [
+                { text: "빵과 생크림, 초콜릿을 준비해요.", step: "1" },
+                { text: "빵을 반으로 잘라요.", step: "2" },
+                { text: "생크림을 바르고 초콜릿을 올려줘요.", step: "3" },
+                { text: "초콜릿 케이크 완성!", step: "4" }
+            ];
+            const totalDropZones = 4;
+
+            const checkButton = document.getElementById('check-button');
+            const resetButton = document.getElementById('reset-button');
+            const resultModal = document.getElementById('result-modal');
+            const closeModalButton = resultModal.querySelector('.close-button');
+            const completionMessage = document.getElementById('completion-message');
+            const activityArea = document.getElementById('activity-area');
+            const cakeDisplayArea = document.getElementById('cake-display-area');
+            const toolboxArea = document.getElementById('toolbox-area');
+
+            let draggedPiece = null;
+            let draggedTool = null;
+
+            function initializePuzzle() {
+                puzzleBoardContainer.innerHTML = '<h2>순서 맞추기</h2>';
+                puzzlePiecesContainer.innerHTML = '<h2>조각 상자</h2>';
+                for (let i = 1; i <= totalDropZones; i++) {
+                    const zone = document.createElement('div');
+                    zone.className = 'drop-zone';
+                    zone.dataset.expectedStep = i;
+                    zone.textContent = `${i}단계`;
+                    puzzleBoardContainer.appendChild(zone);
+                }
+                let piecesToShuffle = pieceData.map(data => createPiece(data));
+                shuffleArray(piecesToShuffle);
+                piecesToShuffle.forEach(piece => puzzlePiecesContainer.appendChild(piece));
+                addPuzzleDragListeners();
+                activityArea.style.display = 'none';
+                closeModal();
+            }
+            function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[array[i], array[j]] = [array[j], array[i]]; } }
+            function createPiece(data) {
+                const piece = document.createElement('div');
+                piece.className = 'piece';
+                piece.textContent = data.text;
+                piece.draggable = true;
+                piece.dataset.step = data.step;
+                return piece;
+            }
+            function handlePuzzleDragStart(e) { if (e.target.classList.contains('piece')) { draggedPiece = e.target; setTimeout(() => e.target.classList.add('dragging'), 0); } }
+            function handlePuzzleDragEnd(e) { if (e.target.classList.contains('piece')) { e.target.classList.remove('dragging'); draggedPiece = null; } }
+            function handlePuzzleDragOver(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (target && target.classList.contains('drop-zone') && !target.querySelector('.piece')) {
+                    target.classList.add('over');
+                }
+            }
+            function handlePuzzleDragLeave(e) { e.target.closest('.drop-zone, #puzzle-pieces')?.classList.remove('over'); }
+            function handlePuzzleDrop(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (!target || !draggedPiece) return;
+                target.classList.remove('over');
+                if (target.id === 'puzzle-pieces' || !target.querySelector('.piece')) {
+                    if (draggedPiece.parentElement.classList.contains('drop-zone')) {
+                        const oldZone = draggedPiece.parentElement;
+                        oldZone.textContent = `${oldZone.dataset.expectedStep}단계`;
+                        oldZone.classList.remove('filled');
+                    }
+                    if(target.id === 'puzzle-pieces') puzzlePiecesContainer.appendChild(draggedPiece);
+                    else { target.innerHTML = ''; target.appendChild(draggedPiece); target.classList.add('filled'); }
+                }
+            }
+            function addPuzzleDragListeners() {
+                const elements = document.querySelectorAll('.piece, .drop-zone, #puzzle-pieces');
+                elements.forEach(el => {
+                    el.addEventListener('dragstart', handlePuzzleDragStart);
+                    el.addEventListener('dragend', handlePuzzleDragEnd);
+                    el.addEventListener('dragover', handlePuzzleDragOver);
+                    el.addEventListener('dragleave', handlePuzzleDragLeave);
+                    el.addEventListener('drop', handlePuzzleDrop);
+                });
+            }
+
+            // ==========================================================
+            // ===               ★★★ 여기가 핵심 수정 ★★★            ===
+            // ==========================================================
+            function setupCakeActivity() {
+                toolboxArea.innerHTML = '';
+                document.querySelectorAll('.cake-layer').forEach(l => l.classList.remove('visible'));
+
+                const tools = [
+                    { id: 'tool-bread', emoji: '🍞', next: 'tool-cream' },
+                    { id: 'tool-cream', emoji: '🥛', next: 'tool-chocolate' },
+                    { id: 'tool-chocolate', emoji: '🍫', next: null }
+                ];
+
+                tools.forEach(toolInfo => {
+                    const tool = document.createElement('div');
+                    tool.id = toolInfo.id;
+                    tool.className = 'tool-item';
+                    tool.textContent = toolInfo.emoji;
+                    tool.draggable = true;
+                    if(tool.id !== 'tool-bread') tool.classList.add('disabled');
+                    
+                    tool.addEventListener('dragstart', e => {
+                       if(!e.target.classList.contains('disabled')) draggedTool = e.target;
+                       else e.preventDefault();
+                    });
+                    toolboxArea.appendChild(tool);
+                });
+
+                cakeDisplayArea.addEventListener('dragover', e => { e.preventDefault(); cakeDisplayArea.classList.add('over'); });
+                cakeDisplayArea.addEventListener('dragleave', () => cakeDisplayArea.classList.remove('over'));
+                cakeDisplayArea.addEventListener('drop', handleCakeDrop);
+            }
+
+            function handleCakeDrop(e) {
+                e.preventDefault();
+                cakeDisplayArea.classList.remove('over');
+                if(!draggedTool) return;
+                
+                const toolId = draggedTool.id;
+                let nextToolId = null;
+
+                if (toolId === 'tool-bread' && !document.getElementById('cake-bread').classList.contains('visible')) {
+                    document.getElementById('cake-bread').classList.add('visible');
+                    completionMessage.textContent = '좋아! 이제 생크림을 듬뿍 발라줘!';
+                    nextToolId = 'tool-cream';
+                } else if (toolId === 'tool-cream' && !document.getElementById('cake-cream').classList.contains('visible')) {
+                    document.getElementById('cake-cream').classList.add('visible');
+                    completionMessage.textContent = '맛있겠다! 초콜릿으로 장식해볼까?';
+                    nextToolId = 'tool-chocolate';
+                } else if (toolId === 'tool-chocolate' && !document.getElementById('cake-toppings').classList.contains('visible')) {
+                    document.getElementById('cake-toppings').classList.add('visible');
+                    completionMessage.innerHTML = '짜잔! 맛있는 초콜릿 케이크 완성! 🎂';
+                    nextToolId = null; 
+                }
+                
+                if (nextToolId) {
+                    document.getElementById(toolId).classList.add('disabled');
+                    document.getElementById(nextToolId).classList.remove('disabled');
+                } else if (toolId === 'tool-chocolate') {
+                     document.getElementById(toolId).classList.add('disabled');
+                }
+                draggedTool = null;
+            }
+
+            function checkPuzzle() {
+                let allCorrect = true;
+                const zones = document.querySelectorAll('#puzzle-board .drop-zone');
+                if (zones.length !== totalDropZones || Array.from(zones).some(z => !z.querySelector('.piece'))) {
+                    completionMessage.innerHTML = '앗! 아직 빈 칸이 있어요!<br>모든 조각을 옮겨주세요! 😊🐨';
+                    activityArea.style.display = 'none';
+                    openModal();
+                    return;
+                }
+                zones.forEach(zone => { if (zone.dataset.expectedStep !== zone.children[0].dataset.step) allCorrect = false; });
+                
+                if (allCorrect) {
+                    completionMessage.innerHTML = '정답! 🥳<br>재료를 순서대로 올려 케이크를 만들어보세요!';
+                    activityArea.style.display = 'block';
+                    setupCakeActivity();
+                } else {
+                    completionMessage.innerHTML = '아직 순서가 맞지 않아요.<br>다시 한번 확인해보세요! 🤔🐨';
+                    activityArea.style.display = 'none';
+                }
+                openModal();
+            }
+
+            function openModal() { resultModal.style.display = "flex"; }
+            function closeModal() { resultModal.style.display = "none"; }
+
+            closeModalButton.addEventListener('click', closeModal);
+            window.addEventListener('click', e => { if (e.target === resultModal) closeModal(); });
+            checkButton.addEventListener('click', checkPuzzle);
+            resetButton.addEventListener('click', initializePuzzle);
+
+            initializePuzzle();
+        });
+    </script>
+</body>
+</html>

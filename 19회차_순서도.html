@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>19회차 - 다 함께 빙고!</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&family=Gaegu:wght@400;700&family=Nanum+Pen+Script&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            margin-top: 30px; background: linear-gradient(135deg, #ffd1dc 0%, #ffecb3 100%);
+            min-height: 100vh; box-sizing: border-box;
+        }
+        *, *::before, *::after { box-sizing: inherit; }
+        .container {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 30px; margin-bottom: 30px;
+        }
+        #puzzle-pieces, #puzzle-board {
+            width: 360px; padding: 25px; background-color: rgba(255, 255, 255, 0.85);
+            border-radius: 25px; box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            min-height: 550px;
+        }
+        #puzzle-pieces h2, #puzzle-board h2 {
+            text-align: center; margin-top: 0; color: #e91e63; margin-bottom: 20px;
+            font-family: 'Nanum Pen Script', cursive; font-size: 2.8em; font-weight: 400;
+            text-shadow: 1px 1px 0px #fff, 2px 2px 0px rgba(0,0,0,0.1);
+        }
+        .piece {
+            background-color: #81c784; color: #333; margin-bottom: 15px; border-radius: 18px;
+            cursor: grab; box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+            width: 100%; height: 85px; display: flex; align-items: center; justify-content: center;
+            padding: 10px; font-family: 'Gaegu', cursive; font-size: 1.1em;
+            text-align: center; font-weight: 700; border: 3px solid rgba(255,255,255,0.7);
+        }
+        .piece.dragging { opacity: 0.6; transform: scale(1.08) rotate(2deg); }
+        .piece[data-step="1"] {
+            background-color: #ffd54f; color: #6D4C41; clip-path: polygon(85% 0%, 15% 0%, 0% 50%, 15% 100%, 85% 100%, 100% 50%);
+            border-radius: 0; border: none;
+        }
+        .piece[data-step="5"] {
+            background-color: #ffab91; color: #BF360C; clip-path: url(#wavyOutputClip);
+            border-radius: 0; border: none;
+        }
+        .drop-zone {
+            background-color: rgba(255, 255, 255, 0.6); color: #78909c; margin-bottom: 15px;
+            border: 3px dashed #ffbad1; border-radius: 18px; text-align: center;
+            width: 100%; height: 85px; display: flex; justify-content: center; align-items: center;
+            transition: all 0.2s ease; font-family: 'Gaegu', cursive; font-size: 1.2em; font-weight: 700;
+        }
+        .drop-zone.over { background-color: #c8e6c9; border-color: #81c784; }
+        .drop-zone.filled { background-color: transparent; border-style: solid; border-color: #ecf1f1; padding: 0; }
+        .drop-zone.filled .piece { width: 100%; height: 100%; margin: 0; box-shadow: none; cursor: default; }
+        .drop-zone.filled .piece:not([data-step="1"]):not([data-step="5"]) { border: none; }
+        .modal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background-color: #fff0f5; margin: auto; padding: 25px; border: 5px solid #ffb6c1;
+            width: 90%; max-width: 500px; border-radius: 20px; position: relative; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); font-family: 'Gaegu', cursive; font-size: 1.2em;
+        }
+        .close-button {
+            color: #e91e63; position: absolute; top: 10px; right: 15px; font-size: 35px;
+            font-weight: bold; transition: transform 0.2s ease; cursor: pointer;
+        }
+        .close-button:hover, .close-button:focus { color: #ad1457; transform: scale(1.1); }
+        
+        #activity-area { display: none; margin-top: 15px; }
+        #teacher-call-area {
+             background: #fffde7; padding: 10px; border-radius: 10px; margin-bottom: 15px;
+             font-size: 1.2em; font-weight: 700;
+        }
+        #bingo-grid {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px;
+            width: 100%; max-width: 400px; margin: 0 auto; aspect-ratio: 1 / 1;
+        }
+        .bingo-cell {
+            background-color: #fff; border: 2px solid #ffc107; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3em; font-weight: 700; cursor: pointer;
+            transition: all 0.3s ease; position: relative;
+        }
+        .bingo-cell.marked {
+            background-color: #f8bbd0; color: #c2185b;
+        }
+        .bingo-cell.marked::after {
+            content: '쾅!'; font-family: 'Nanum Pen Script'; font-size: 1.5em;
+            color: #d32f2f; border: 2px double #d32f2f; border-radius: 50%;
+            padding: 0 5px; position: absolute; transform: rotate(-15deg);
+        }
+        @keyframes bingo-flash {
+            from { background-color: #c8e6c9; transform: scale(1.05); }
+            to { background-color: #f8bbd0; transform: scale(1); }
+        }
+        .bingo-cell.bingo-line { animation: bingo-flash 0.5s ease-in-out 3; }
+
+        #completion-message {
+            font-size: 1.6em; color: #4CAF50; font-weight: bold; text-align: center;
+            margin-bottom: 15px; line-height: 1.4;
+        }
+        #check-button, #reset-button {
+            padding: 14px 28px; font-size: 1.2em; color: white; background-color: #ff9800;
+            border: none; border-radius: 30px; cursor: pointer;
+            margin-top: 15px; box-shadow: 0 4px 0 #e68a00; text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            font-family: 'Gaegu', cursive; font-weight: 700;
+        }
+        #reset-button { background-color: #f44336; box-shadow: 0 4px 0 #d32f2f; margin-left: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="puzzle-pieces"><h2>조각 상자</h2></div>
+        <div id="puzzle-board"><h2>순서 맞추기</h2></div>
+    </div>
+    <div class="controls">
+        <button id="check-button">확인하기</button>
+        <button id="reset-button">다시 시작</button>
+    </div>
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">×</span>
+            <p id="completion-message"></p>
+            <div id="activity-area">
+                <div id="teacher-call-area"></div>
+                <div id="bingo-grid"></div>
+            </div>
+        </div>
+    </div>
+    <svg class="hidden-svg">
+      <defs>
+        <clipPath id="wavyOutputClip" clipPathUnits="objectBoundingBox">
+          <path d="M1,0 L0,0 L0,0.8 Q0.25 1.15 0.5 0.8 T1 0.8 Z" />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const puzzlePiecesContainer = document.getElementById('puzzle-pieces');
+            const puzzleBoardContainer = document.getElementById('puzzle-board');
+            
+            const pieceData = [
+                { text: "5x5 크기의 빙고판을 준비해요.", step: "1" },
+                { text: "빙고판에 1부터 100까지 수 중 25개를 적어요.", step: "2" },
+                { text: "선생님이 불러준 문제의 답과 같은 수를 표시해요.", step: "3" },
+                { text: "같은 줄에 5개가 표시되면 1개의 빙고 완성!", step: "4" },
+                { text: "3개의 빙고가 먼저 되는 사람이 1등!", step: "5" }
+            ];
+            const totalDropZones = 5;
+
+            const checkButton = document.getElementById('check-button');
+            const resetButton = document.getElementById('reset-button');
+            const resultModal = document.getElementById('result-modal');
+            const closeModalButton = resultModal.querySelector('.close-button');
+            const completionMessage = document.getElementById('completion-message');
+            const activityArea = document.getElementById('activity-area');
+            const bingoGrid = document.getElementById('bingo-grid');
+            const teacherCallArea = document.getElementById('teacher-call-area');
+            
+            let draggedPiece = null;
+            let correctAnswer = null;
+
+            function initializePuzzle() {
+                puzzleBoardContainer.innerHTML = '<h2>순서 맞추기</h2>';
+                puzzlePiecesContainer.innerHTML = '<h2>조각 상자</h2>';
+                for (let i = 1; i <= totalDropZones; i++) {
+                    const zone = document.createElement('div');
+                    zone.className = 'drop-zone';
+                    zone.dataset.expectedStep = i;
+                    zone.textContent = `${i}단계`;
+                    puzzleBoardContainer.appendChild(zone);
+                }
+                let piecesToShuffle = pieceData.map(data => createPiece(data));
+                shuffleArray(piecesToShuffle);
+                piecesToShuffle.forEach(piece => puzzlePiecesContainer.appendChild(piece));
+                addPuzzleDragListeners();
+                activityArea.style.display = 'none';
+                closeModal();
+            }
+            function shuffleArray(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[array[i], array[j]] = [array[j], array[i]]; } }
+            function createPiece(data) {
+                const piece = document.createElement('div');
+                piece.className = 'piece';
+                piece.textContent = data.text;
+                piece.draggable = true;
+                piece.dataset.step = data.step;
+                return piece;
+            }
+            function handlePuzzleDragStart(e) { if (e.target.classList.contains('piece')) { draggedPiece = e.target; setTimeout(() => e.target.classList.add('dragging'), 0); } }
+            function handlePuzzleDragEnd(e) { if (e.target.classList.contains('piece')) { e.target.classList.remove('dragging'); draggedPiece = null; } }
+            function handlePuzzleDragOver(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (target && target.classList.contains('drop-zone') && !target.querySelector('.piece')) {
+                    target.classList.add('over');
+                }
+            }
+            function handlePuzzleDragLeave(e) { e.target.closest('.drop-zone, #puzzle-pieces')?.classList.remove('over'); }
+            function handlePuzzleDrop(e) {
+                e.preventDefault();
+                const target = e.target.closest('.drop-zone, #puzzle-pieces');
+                if (!target || !draggedPiece) return;
+                target.classList.remove('over');
+                if (target.id === 'puzzle-pieces' || !target.querySelector('.piece')) {
+                    if (draggedPiece.parentElement.classList.contains('drop-zone')) {
+                        const oldZone = draggedPiece.parentElement;
+                        oldZone.textContent = `${oldZone.dataset.expectedStep}단계`;
+                        oldZone.classList.remove('filled');
+                    }
+                    if(target.id === 'puzzle-pieces') puzzlePiecesContainer.appendChild(draggedPiece);
+                    else { target.innerHTML = ''; target.appendChild(draggedPiece); target.classList.add('filled'); }
+                }
+            }
+            function addPuzzleDragListeners() {
+                const elements = document.querySelectorAll('.piece, .drop-zone, #puzzle-pieces');
+                elements.forEach(el => {
+                    el.addEventListener('dragstart', handlePuzzleDragStart);
+                    el.addEventListener('dragend', handlePuzzleDragEnd);
+                    el.addEventListener('dragover', handlePuzzleDragOver);
+                    el.addEventListener('dragleave', handlePuzzleDragLeave);
+                    el.addEventListener('drop', handlePuzzleDrop);
+                });
+            }
+
+            // ==========================================================
+            // ===               ★★★ 여기가 핵심 수정 ★★★            ===
+            // ==========================================================
+            function setupSimpleBingo() {
+                bingoGrid.innerHTML = '';
+                
+                // 1. 랜덤 숫자 25개 생성
+                let boardNumbers = [];
+                while(boardNumbers.length < 25) {
+                    let r = Math.floor(Math.random() * 100) + 1;
+                    if(boardNumbers.indexOf(r) === -1) boardNumbers.push(r);
+                }
+
+                // 2. 빙고가 될 라인과 정답 숫자 정하기
+                const bingoLineIndexes = [10, 11, 12, 13, 14]; // 가운데 가로줄
+                correctAnswer = boardNumbers[12]; // 가운데 숫자를 정답으로 설정
+                teacherCallArea.textContent = `선생님: "${correctAnswer}"를 찾아보세요!`;
+
+                // 3. 빙고판 그리기
+                boardNumbers.forEach((num, index) => {
+                    const cell = document.createElement('div');
+                    cell.className = 'bingo-cell';
+                    cell.textContent = num;
+                    cell.dataset.number = num;
+
+                    // 빙고 라인의 정답 칸을 제외한 나머지 칸들을 미리 표시
+                    if (bingoLineIndexes.includes(index) && num !== correctAnswer) {
+                        cell.classList.add('marked');
+                    }
+                    
+                    cell.addEventListener('click', handleCellClick);
+                    bingoGrid.appendChild(cell);
+                });
+            }
+
+            function handleCellClick(event) {
+                const cell = event.currentTarget;
+                const clickedNumber = parseInt(cell.dataset.number);
+
+                if (clickedNumber === correctAnswer) {
+                    cell.classList.add('marked');
+                    completionMessage.innerHTML = "빙고! 한 줄을 완성했어! 참 잘했다! 🎉";
+                    
+                    // 완성된 라인에 애니메이션 효과 주기
+                    const bingoLineIndexes = [10, 11, 12, 13, 14];
+                    bingoLineIndexes.forEach(index => {
+                        bingoGrid.children[index].classList.add('bingo-line');
+                    });
+
+                    // 더 이상 클릭할 수 없게 막기
+                    bingoGrid.querySelectorAll('.bingo-cell').forEach(c => c.style.pointerEvents = 'none');
+                } else {
+                    completionMessage.textContent = "어? 선생님이 부른 숫자가 아닌데? 다시 찾아보자!";
+                }
+            }
+
+            function checkPuzzle() {
+                let allCorrect = true;
+                const zones = document.querySelectorAll('#puzzle-board .drop-zone');
+                if (zones.length !== totalDropZones || Array.from(zones).some(z => !z.querySelector('.piece'))) {
+                    completionMessage.innerHTML = '앗! 아직 빈 칸이 있어요!<br>모든 조각을 옮겨주세요! 😊🐨';
+                    activityArea.style.display = 'none';
+                    openModal();
+                    return;
+                }
+                zones.forEach(zone => { if (zone.dataset.expectedStep !== zone.children[0].dataset.step) allCorrect = false; });
+                
+                if (allCorrect) {
+                    completionMessage.innerHTML = '정답이야! 🥳<br>와! 빙고가 되기까지 딱 한 칸 남았어!';
+                    activityArea.style.display = 'block';
+                    setupSimpleBingo();
+                } else {
+                    completionMessage.innerHTML = '아직 순서가 맞지 않아요.<br>다시 한번 확인해보세요! 🤔🐨';
+                    activityArea.style.display = 'none';
+                }
+                openModal();
+            }
+
+            function openModal() { resultModal.style.display = "flex"; }
+            function closeModal() { resultModal.style.display = "none"; }
+
+            closeModalButton.addEventListener('click', closeModal);
+            window.addEventListener('click', e => { if (e.target === resultModal) closeModal(); });
+            checkButton.addEventListener('click', checkPuzzle);
+            resetButton.addEventListener('click', initializePuzzle);
+
+            initializePuzzle();
+        });
+    </script>
+</body>
+</html>
